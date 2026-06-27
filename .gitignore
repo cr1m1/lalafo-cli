@@ -1,0 +1,19 @@
+# Binaries
+lalafo-pp-cli
+lalafo-pp-mcp
+lalafo
+*.exe
+
+# Build artifacts
+build/
+dist/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db

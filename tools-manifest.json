@@ -1,0 +1,165 @@
+{
+  "api_name": "lalafo",
+  "base_url": "https://api.lalafo.com",
+  "description": "Undocumented REST API for lalafo.kg — Kyrgyz classifieds marketplace.\nCovers ads search, category browsing, and ad detail viewing.\nBase URL: https://api.lalafo.com\nRequired headers on all requests: Device, Language, Country-Id",
+  "mcp_ready": "full",
+  "http_transport": "standard",
+  "auth": {
+    "type": "none"
+  },
+  "required_headers": [
+    {
+      "name": "Device",
+      "value": "web"
+    },
+    {
+      "name": "Language",
+      "value": "ru"
+    },
+    {
+      "name": "Country-Id",
+      "value": "12"
+    }
+  ],
+  "tools": [
+    {
+      "name": "ads_get",
+      "description": "Retrieve full details for a single ad by ID. Required: id. Returns the Ad.",
+      "method": "GET",
+      "path": "/v3/ads/{id}",
+      "no_auth": true,
+      "params": [
+        {
+          "name": "id",
+          "type": "int",
+          "location": "path",
+          "description": "Ad ID",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "ads_get-count",
+      "description": "Returns the total number of active ads.",
+      "method": "GET",
+      "path": "/v3/ads/count",
+      "no_auth": true,
+      "params": []
+    },
+    {
+      "name": "ads_list",
+      "description": "Browse latest ads with optional category and user filters. Returns paginated results. Optional: per-page (default: 20), page (default: 1), category_id (plus 1 more).",
+      "method": "GET",
+      "path": "/v3/ads",
+      "no_auth": true,
+      "params": [
+        {
+          "name": "per-page",
+          "type": "int",
+          "location": "query",
+          "description": "Number of results per page"
+        },
+        {
+          "name": "page",
+          "type": "int",
+          "location": "query",
+          "description": "Page number"
+        },
+        {
+          "name": "category_id",
+          "type": "int",
+          "location": "query",
+          "description": "Filter by category ID"
+        },
+        {
+          "name": "user_id",
+          "type": "int",
+          "location": "query",
+          "description": "Filter by user ID"
+        }
+      ]
+    },
+    {
+      "name": "ads_search",
+      "description": "Search ads by keyword query with optional category filter. Required: q. Optional: per-page (default: 20), page (default: 1), category_id. Returns array of Ad.",
+      "method": "GET",
+      "path": "/v3/ads/search",
+      "no_auth": true,
+      "params": [
+        {
+          "name": "q",
+          "type": "string",
+          "location": "query",
+          "description": "Search query",
+          "required": true
+        },
+        {
+          "name": "per-page",
+          "type": "int",
+          "location": "query",
+          "description": "Per page"
+        },
+        {
+          "name": "page",
+          "type": "int",
+          "location": "query",
+          "description": "Page"
+        },
+        {
+          "name": "category_id",
+          "type": "int",
+          "location": "query",
+          "description": "Filter by category ID"
+        }
+      ]
+    },
+    {
+      "name": "categories_get-category-tree",
+      "description": "Returns the full hierarchical category tree with nested children.",
+      "method": "GET",
+      "path": "/v3/categories/tree",
+      "no_auth": true,
+      "params": []
+    },
+    {
+      "name": "countries_list",
+      "description": "Returns all countries where Lalafo operates.",
+      "method": "GET",
+      "path": "/v3/countries",
+      "no_auth": true,
+      "params": []
+    },
+    {
+      "name": "params_get-category",
+      "description": "Returns available filter parameters (condition, model, year, etc.) for a given category. Required: categoryId.",
+      "method": "GET",
+      "path": "/v3/params/{categoryId}",
+      "no_auth": true,
+      "params": [
+        {
+          "name": "categoryId",
+          "type": "int",
+          "location": "path",
+          "description": "Category ID",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "users_get",
+      "description": "Retrieve a user's public profile by ID. Required: id. Returns the User.",
+      "method": "GET",
+      "path": "/v3/users/{id}",
+      "no_auth": true,
+      "params": [
+        {
+          "name": "id",
+          "type": "int",
+          "location": "path",
+          "description": "User ID",
+          "required": true
+        }
+      ]
+    }
+  ]
+}

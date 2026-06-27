@@ -1,0 +1,27 @@
+{
+  "manifest_version": "0.3",
+  "name": "lalafo-pp-mcp",
+  "display_name": "Lalafo",
+  "version": "0.0.0",
+  "description": "Undocumented REST API for lalafo.kg — Kyrgyz classifieds marketplace.",
+  "author": {
+    "name": "CLI Printing Press"
+  },
+  "license": "Apache-2.0",
+  "server": {
+    "type": "binary",
+    "entry_point": "bin/lalafo-pp-mcp",
+    "mcp_config": {
+      "command": "${__dirname}/bin/lalafo-pp-mcp",
+      "args": []
+    }
+  },
+  "compatibility": {
+    "claude_desktop": ">=1.0.0",
+    "platforms": [
+      "darwin",
+      "linux",
+      "win32"
+    ]
+  }
+}

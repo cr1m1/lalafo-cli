@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-06-27T13:56:44.691807Z",
+  "printing_press_version": "4.26.1",
+  "api_name": "lalafo",
+  "display_name": "Lalafo",
+  "cli_name": "lalafo-pp-cli",
+  "creator": {
+    "name": "cr1m1"
+  },
+  "printer_name": "cr1m1",
+  "spec_path": "lalafo-openapi.yaml",
+  "spec_format": "openapi3",
+  "spec_checksum": "sha256:cddc44ce565470fab6f46ec602cc1bff2d7023f56e42051c260ccd782599930e",
+  "run_id": "20260627-135644",
+  "description": "Undocumented REST API for lalafo.kg — Kyrgyz classifieds marketplace.",
+  "mcp_binary": "lalafo-pp-mcp",
+  "mcp_tool_count": 8,
+  "mcp_public_tool_count": 8,
+  "mcp_ready": "full",
+  "api_version": "3.0",
+  "auth_type": "none"
+}

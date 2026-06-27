@@ -1,0 +1,657 @@
+openapi: 3.0.3
+info:
+  title: Lalafo API
+  description: |
+    Undocumented REST API for lalafo.kg — Kyrgyz classifieds marketplace.
+    Covers ads search, category browsing, and ad detail viewing.
+    Base URL: https://api.lalafo.com
+    Required headers on all requests: Device, Language, Country-Id
+  version: "3.0"
+  contact:
+    name: Lalafo
+    url: https://lalafo.kg
+servers:
+  - url: https://api.lalafo.com
+    description: Production API
+paths:
+  /v3/ads:
+    get:
+      operationId: listAds
+      summary: List ads
+      description: Browse latest ads with optional category and user filters. Returns paginated results.
+      tags:
+        - Ads
+      parameters:
+        - name: per-page
+          in: query
+          schema:
+            type: integer
+            default: 20
+          description: Number of results per page
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+          description: Page number
+        - name: category_id
+          in: query
+          schema:
+            type: integer
+          description: Filter by category ID
+        - name: user_id
+          in: query
+          schema:
+            type: integer
+          description: Filter by user ID
+        - name: Device
+          in: header
+          required: true
+          schema:
+            type: string
+            default: web
+        - name: Language
+          in: header
+          required: true
+          schema:
+            type: string
+            default: ru
+            enum: [ru, en, ky, az]
+        - name: Country-Id
+          in: header
+          required: true
+          schema:
+            type: integer
+            default: 12
+          description: "Country ID (12=Kyrgyzstan, 13=Azerbaijan)"
+      responses:
+        "200":
+          description: Paginated list of ads
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdsListResponse"
+
+  /v3/ads/search:
+    get:
+      operationId: searchAds
+      summary: Search ads
+      description: Search ads by keyword query with optional category filter.
+      tags:
+        - Ads
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Search query
+        - name: per-page
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: category_id
+          in: query
+          schema:
+            type: integer
+          description: Filter by category ID
+        - name: Device
+          in: header
+          required: true
+          schema:
+            type: string
+            default: web
+        - name: Language
+          in: header
+          required: true
+          schema:
+            type: string
+            default: ru
+        - name: Country-Id
+          in: header
+          required: true
+          schema:
+            type: integer
+            default: 12
+      responses:
+        "200":
+          description: Search results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdsListResponse"
+
+  /v3/ads/{id}:
+    get:
+      operationId: getAd
+      summary: Get ad details
+      description: Retrieve full details for a single ad by ID.
+      tags:
+        - Ads
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Ad ID
+        - name: Device
+          in: header
+          required: true
+          schema:
+            type: string
+            default: web
+        - name: Language
+          in: header
+          required: true
+          schema:
+            type: string
+            default: ru
+        - name: Country-Id
+          in: header
+          required: true
+          schema:
+            type: integer
+            default: 12
+      responses:
+        "200":
+          description: Ad details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ad"
+        "410":
+          description: Ad has been deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /v3/ads/count:
+    get:
+      operationId: getAdsCount
+      summary: Get total ads count
+      description: Returns the total number of active ads.
+      tags:
+        - Ads
+      parameters:
+        - name: Device
+          in: header
+          required: true
+          schema:
+            type: string
+            default: web
+        - name: Language
+          in: header
+          required: true
+          schema:
+            type: string
+            default: ru
+        - name: Country-Id
+          in: header
+          required: true
+          schema:
+            type: integer
+            default: 12
+      responses:
+        "200":
+          description: Ads count
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ads_count:
+                    type: string
+                  feed-name:
+                    type: string
+                  feed-id:
+                    type: integer
+
+  /v3/categories/tree:
+    get:
+      operationId: getCategoryTree
+      summary: Get category tree
+      description: Returns the full hierarchical category tree with nested children.
+      tags:
+        - Categories
+      parameters:
+        - name: Device
+          in: header
+          required: true
+          schema:
+            type: string
+            default: web
+        - name: Language
+          in: header
+          required: true
+          schema:
+            type: string
+            default: ru
+        - name: Country-Id
+          in: header
+          required: true
+          schema:
+            type: integer
+            default: 12
+      responses:
+        "200":
+          description: Category tree
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Category"
+
+  /v3/params/{categoryId}:
+    get:
+      operationId: getCategoryParams
+      summary: Get category filter params
+      description: Returns available filter parameters (condition, model, year, etc.) for a given category.
+      tags:
+        - Categories
+      parameters:
+        - name: categoryId
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Category ID
+        - name: Device
+          in: header
+          required: true
+          schema:
+            type: string
+            default: web
+        - name: Language
+          in: header
+          required: true
+          schema:
+            type: string
+            default: ru
+        - name: Country-Id
+          in: header
+          required: true
+          schema:
+            type: integer
+            default: 12
+      responses:
+        "200":
+          description: Category params
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CategoryParam"
+
+  /v3/users/{id}:
+    get:
+      operationId: getUser
+      summary: Get user profile
+      description: Retrieve a user's public profile by ID.
+      tags:
+        - Users
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: User ID
+        - name: Device
+          in: header
+          required: true
+          schema:
+            type: string
+            default: web
+        - name: Language
+          in: header
+          required: true
+          schema:
+            type: string
+            default: ru
+        - name: Country-Id
+          in: header
+          required: true
+          schema:
+            type: integer
+            default: 12
+      responses:
+        "200":
+          description: User profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+
+  /v3/countries:
+    get:
+      operationId: listCountries
+      summary: List countries
+      description: Returns all countries where Lalafo operates.
+      tags:
+        - Countries
+      parameters:
+        - name: Device
+          in: header
+          required: true
+          schema:
+            type: string
+            default: web
+        - name: Language
+          in: header
+          required: true
+          schema:
+            type: string
+            default: ru
+        - name: Country-Id
+          in: header
+          required: true
+          schema:
+            type: integer
+            default: 12
+      responses:
+        "200":
+          description: Countries list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Country"
+
+components:
+  schemas:
+    AdsListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Ad"
+        _links:
+          type: object
+          properties:
+            self:
+              type: object
+              properties:
+                href:
+                  type: string
+            next:
+              type: object
+              properties:
+                href:
+                  type: string
+            last:
+              type: object
+              properties:
+                href:
+                  type: string
+        _meta:
+          type: object
+          properties:
+            totalCount:
+              type: integer
+            pageCount:
+              type: integer
+            currentPage:
+              type: integer
+            perPage:
+              type: integer
+            feed:
+              type: string
+            feed_id:
+              type: integer
+
+    Ad:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        description:
+          type: string
+        price:
+          type: number
+        currency:
+          type: string
+        symbol:
+          type: string
+        category_id:
+          type: integer
+        city:
+          type: string
+        city_id:
+          type: integer
+        city_alias:
+          type: string
+        lat:
+          type: number
+        lng:
+          type: number
+        mobile:
+          type: string
+        is_negotiable:
+          type: boolean
+        is_vip:
+          type: boolean
+        is_premium:
+          type: boolean
+        is_select:
+          type: boolean
+        views:
+          type: integer
+        impressions:
+          type: integer
+        favorite_count:
+          type: integer
+        created_time:
+          type: integer
+          description: Unix timestamp
+        updated_time:
+          type: integer
+          description: Unix timestamp
+        images:
+          type: array
+          items:
+            $ref: "#/components/schemas/Image"
+        params:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdParam"
+        user:
+          $ref: "#/components/schemas/AdUser"
+        user_id:
+          type: integer
+        country_id:
+          type: integer
+        status_id:
+          type: integer
+
+    Image:
+      type: object
+      properties:
+        id:
+          type: integer
+        is_main:
+          type: boolean
+        width:
+          type: integer
+        height:
+          type: integer
+        original_url:
+          type: string
+        thumbnail_url:
+          type: string
+        original_webp_url:
+          type: string
+        thumbnail_webp_url:
+          type: string
+
+    AdParam:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        value:
+          type: string
+        value_id:
+          type: integer
+
+    AdUser:
+      type: object
+      properties:
+        id:
+          type: integer
+        username:
+          type: string
+        avatar:
+          type: string
+          nullable: true
+        pro:
+          type: boolean
+        is_banned:
+          type: boolean
+        response_rate:
+          type: integer
+        response_time:
+          type: integer
+        response_info:
+          type: string
+
+    Category:
+      type: object
+      properties:
+        id:
+          type: integer
+        parent_id:
+          type: integer
+        name:
+          type: string
+        ads_count:
+          type: integer
+        url:
+          type: string
+        image:
+          type: string
+        icon_image:
+          type: string
+        color:
+          type: string
+        order:
+          type: integer
+        feed_type:
+          type: string
+        active:
+          type: boolean
+        children:
+          type: array
+          items:
+            $ref: "#/components/schemas/Category"
+
+    CategoryParam:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        kind:
+          type: string
+          enum: [dropdown, range, text]
+        is_range:
+          type: boolean
+        is_multi_select:
+          type: boolean
+        alias:
+          type: string
+        values:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+              value:
+                type: string
+              alias:
+                type: string
+              is_popular:
+                type: boolean
+
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        username:
+          type: string
+        avatar:
+          type: string
+          nullable: true
+        about:
+          type: string
+          nullable: true
+        pro:
+          type: boolean
+        businessProfile:
+          type: boolean
+        response_rate:
+          type: integer
+        response_time:
+          type: integer
+        response_info:
+          type: string
+        verify:
+          type: string
+        create_time:
+          type: integer
+        is_banned:
+          type: boolean
+        is_deleted:
+          type: boolean
+
+    Country:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        code:
+          type: string
+        domain:
+          type: string
+        default_language:
+          type: string
+        default_currency_code:
+          type: string
+        time_zone:
+          type: string
+        phone_mask:
+          type: string
+        is_support_payment:
+          type: boolean
+
+    Error:
+      type: object
+      properties:
+        name:
+          type: string
+        message:
+          type: string
+        code:
+          type: integer
+        status:
+          type: integer
