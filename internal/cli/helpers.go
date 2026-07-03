@@ -1285,7 +1285,8 @@ func printCSV(w io.Writer, data json.RawMessage) error {
 				} else {
 					s = fmt.Sprintf("%v", v)
 				}
-				if strings.ContainsAny(s, ",\"\n") {
+				// Bug #4 fix: include \r per RFC 4180.
+				if strings.ContainsAny(s, ",\"\n\r") {
 					s = `"` + strings.ReplaceAll(s, `"`, `""`) + `"`
 				}
 				vals = append(vals, s)
@@ -1661,7 +1662,17 @@ func splitCamelCase(s string) []string {
 // printAutoCards renders items as labeled cards — one block per item.
 // Used for complex responses with many fields or nested data.
 func printAutoCards(w io.Writer, items []map[string]any) error {
-	headers := prioritizeAllHeaders(items[0])
+	// Bug #11 fix: union field names from all items so fields only present
+	// in items[1..n] are not silently omitted from every card.
+	union := map[string]any{}
+	for _, item := range items {
+		for k, v := range item {
+			if _, ok := union[k]; !ok {
+				union[k] = v
+			}
+		}
+	}
+	headers := prioritizeAllHeaders(union)
 
 	// Find the longest header for alignment (from fields we'll actually show)
 	maxLen := 0
@@ -1680,7 +1691,8 @@ func printAutoCards(w io.Writer, items []map[string]any) error {
 		titleVal := formatCellValue(item[headers[0]])
 		if len(headers) > 1 {
 			secondVal := formatCellValue(item[headers[1]])
-			if secondVal != "" {
+			// Bug #5 fix: only show dash separator when second field has a value.
+			if secondVal != "" && secondVal != "null" {
 				fmt.Fprintf(w, "%s %s — %s\n", bold(strings.ToUpper(headers[0])), titleVal, secondVal)
 			} else {
 				fmt.Fprintf(w, "%s %s\n", bold(strings.ToUpper(headers[0])), titleVal)
@@ -1934,7 +1946,8 @@ func defaultDBPath(name string) string {
 		if home, homeErr := os.UserHomeDir(); homeErr == nil {
 			return filepath.Join(home, ".local", "share", name, "data.db")
 		}
-		return "data.db"
+		// Bug #12 fix: use temp dir instead of CWD-relative path.
+		return filepath.Join(os.TempDir(), name, "data.db")
 	}
 	return filepath.Join(dir, "data.db")
 }

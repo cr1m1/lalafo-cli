@@ -1403,12 +1403,14 @@ func upsertSingleObject(db *store.Store, resource string, data json.RawMessage) 
 }
 
 // parseSinceDuration converts human-friendly duration strings into a time.Time.
-// Supported formats: "7d" (days), "24h" (hours), "30m" (minutes), "1w" (weeks).
+// Supported formats: "7d" (days), "24h" (hours), "30m" (minutes), "1w" (weeks),
+// "3M" (months, approx 30 days). Note: lowercase 'm' is minutes, uppercase 'M'
+// is months — matching common conventions (date, moment.js).
 func parseSinceDuration(s string) (time.Time, error) {
-	re := regexp.MustCompile(`^(\d+)([dhwm])$`)
+	re := regexp.MustCompile(`^(\d+)([dhwmM])$`)
 	matches := re.FindStringSubmatch(strings.TrimSpace(s))
 	if matches == nil {
-		return time.Time{}, fmt.Errorf("expected format like 7d, 24h, 1w, or 30m")
+		return time.Time{}, fmt.Errorf("expected format like 7d, 24h, 1w, 30m (minutes), or 3M (months)")
 	}
 
 	n, err := strconv.Atoi(matches[1])
@@ -1426,6 +1428,9 @@ func parseSinceDuration(s string) (time.Time, error) {
 		return now.Add(-time.Duration(n) * 7 * 24 * time.Hour), nil
 	case "m":
 		return now.Add(-time.Duration(n) * time.Minute), nil
+	case "M":
+		// Approximate month as 30 days.
+		return now.Add(-time.Duration(n) * 30 * 24 * time.Hour), nil
 	default:
 		return time.Time{}, fmt.Errorf("unknown unit %q", matches[2])
 	}

@@ -739,12 +739,15 @@ func resourcesTableHasCompositeKey(ctx context.Context, conn *sql.Conn) (bool, e
 }
 
 func rebuildResourcesFTS(ctx context.Context, conn *sql.Conn) error {
-	rows, err := conn.QueryContext(ctx, `SELECT id, resource_type, data FROM resources`)
+	// Use actual SQLite rowids from the resources table instead of FNV hashes
+	// to eliminate collision risk (see bug #1: birthday-paradox at scale).
+	rows, err := conn.QueryContext(ctx, `SELECT rowid, id, resource_type, data FROM resources`)
 	if err != nil {
 		return fmt.Errorf("querying resources: %w", err)
 	}
 
 	type resourceRow struct {
+		rowid        int64
 		id           string
 		resourceType string
 		data         string
@@ -752,7 +755,7 @@ func rebuildResourcesFTS(ctx context.Context, conn *sql.Conn) error {
 	var resources []resourceRow
 	for rows.Next() {
 		var r resourceRow
-		if err := rows.Scan(&r.id, &r.resourceType, &r.data); err != nil {
+		if err := rows.Scan(&r.rowid, &r.id, &r.resourceType, &r.data); err != nil {
 			rows.Close()
 			return fmt.Errorf("scanning resource: %w", err)
 		}
@@ -769,7 +772,7 @@ func rebuildResourcesFTS(ctx context.Context, conn *sql.Conn) error {
 	for _, r := range resources {
 		if _, err := conn.ExecContext(ctx,
 			`INSERT INTO resources_fts (rowid, id, resource_type, content) VALUES (?, ?, ?, ?)`,
-			ftsRowID(r.resourceType, r.id), r.id, r.resourceType, searchableResourceContent(json.RawMessage(r.data)),
+			r.rowid, r.id, r.resourceType, searchableResourceContent(json.RawMessage(r.data)),
 		); err != nil {
 			return fmt.Errorf("indexing resource %s/%s: %w", r.resourceType, r.id, err)
 		}
@@ -885,17 +888,29 @@ func isSQLiteBusy(err error) bool {
 }
 
 func (s *Store) upsertGenericResourceTx(tx *sql.Tx, resourceType, id string, data json.RawMessage) error {
+	// Bug #6 fix: capture timestamp once so synced_at and updated_at are identical.
+	now := time.Now().UTC().Format(time.RFC3339)
 	_, err := tx.Exec(
 		`INSERT INTO resources (id, resource_type, data, synced_at, updated_at)
 		 VALUES (?, ?, ?, ?, ?)
 		 ON CONFLICT(resource_type, id) DO UPDATE SET data = excluded.data, synced_at = excluded.synced_at, updated_at = excluded.updated_at`,
-		id, resourceType, string(data), time.Now().UTC().Format(time.RFC3339), time.Now().UTC().Format(time.RFC3339),
+		id, resourceType, string(data), now, now,
 	)
 	if err != nil {
 		return err
 	}
 
-	ftsRowid := ftsRowID(resourceType, id)
+	// Bug #1 fix: use actual SQLite rowid from the resources table instead of
+	// FNV-64 hash. The hash approach has birthday-paradox collision risk that
+	// silently corrupts the FTS index at scale. The resources table's rowid is
+	// guaranteed unique by SQLite.
+	var ftsRowid int64
+	if err = tx.QueryRow(`SELECT rowid FROM resources WHERE resource_type = ? AND id = ?`, resourceType, id).Scan(&ftsRowid); err != nil {
+		// Rowid lookup failure is non-fatal for FTS; the primary upsert succeeded.
+		fmt.Fprintf(os.Stderr, "warning: FTS rowid lookup failed: %v\n", err)
+		return nil
+	}
+
 	// Use explicit rowid for FTS5 compatibility with modernc.org/sqlite.
 	// Standard DELETE WHERE column=? may not work on FTS5 virtual tables.
 	if _, err = tx.Exec(`DELETE FROM resources_fts WHERE rowid = ?`, ftsRowid); err != nil {

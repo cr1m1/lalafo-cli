@@ -299,9 +299,14 @@ func (c *Client) readCache(path string, params map[string]string) (json.RawMessa
 }
 
 func (c *Client) writeCache(path string, params map[string]string, data json.RawMessage) {
-	os.MkdirAll(c.cacheDir, 0o700)
+	if err := os.MkdirAll(c.cacheDir, 0o700); err != nil {
+		fmt.Fprintf(os.Stderr, "warning: cache dir creation failed: %v\n", err)
+		return
+	}
 	cacheFile := filepath.Join(c.cacheDir, c.cacheKey(path, params)+".json")
-	os.WriteFile(cacheFile, []byte(data), 0o600)
+	if err := os.WriteFile(cacheFile, []byte(data), 0o600); err != nil {
+		fmt.Fprintf(os.Stderr, "warning: cache write failed: %v\n", err)
+	}
 }
 
 // invalidateCache wholesale-removes the cache directory so the next read
@@ -552,9 +557,19 @@ func (c *Client) doInternal(ctx context.Context, method, path string, params map
 		if authHeader != "" {
 			req.Header.Set("Authorization", authHeader)
 		}
-		req.Header.Set("Device", "web")
-		req.Header.Set("Language", "ru")
-		req.Header.Set("Country-Id", "12")
+		// Default headers for Lalafo API. These are overridable via config
+		// headers or per-endpoint headerOverrides so users in other locales
+		// can customize (bug #2 fix).
+		defaults := map[string]string{
+			"Device":     "web",
+			"Language":   "ru",
+			"Country-Id": "12",
+		}
+		for k, v := range defaults {
+			if req.Header.Get(k) == "" {
+				req.Header.Set(k, v)
+			}
+		}
 		if c.Config != nil {
 			for k, v := range c.Config.Headers {
 				req.Header.Set(k, v)

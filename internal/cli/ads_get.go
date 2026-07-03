@@ -23,7 +23,7 @@ func newAdsGetCmd(flags *rootFlags) *cobra.Command {
 				return cmd.Help()
 			}
 			path := "/v3/ads/{id}"
-			if len(args) < 1 || args[0] == "" {
+			if args[0] == "" {
 				return usageErr(fmt.Errorf("id is required\nUsage: %s <%s>", cmd.CommandPath(), "id"))
 			}
 			path = replacePathParam(path, "id", args[0])

@@ -579,8 +579,14 @@ func TestMigrate_V2ResourcesFTSRowIDUpgrade(t *testing.T) {
 	if err := s.DB().QueryRow(`SELECT rowid FROM resources_fts WHERE id = 'shared' AND resource_type = 'biz'`).Scan(&rowid); err != nil {
 		t.Fatalf("read rebuilt resources_fts rowid: %v", err)
 	}
-	if want := ftsRowID("biz", "shared"); rowid != want {
-		t.Fatalf("resources_fts rowid = %d, want %d", rowid, want)
+	// After bug #1 fix, FTS rowids come from the resources table's actual
+	// SQLite rowid instead of FNV-64 hashes, so verify it matches.
+	var wantRowid int64
+	if err := s.DB().QueryRow(`SELECT rowid FROM resources WHERE resource_type = 'biz' AND id = 'shared'`).Scan(&wantRowid); err != nil {
+		t.Fatalf("read resources table rowid: %v", err)
+	}
+	if rowid != wantRowid {
+		t.Fatalf("resources_fts rowid = %d, want %d (from resources table)", rowid, wantRowid)
 	}
 
 	data, err := s.Get("biz", "shared")
