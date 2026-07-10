@@ -63,6 +63,19 @@ func TestUnwrapListEnvelope(t *testing.T) {
 			input:  `{"ads_count":123456,"feed-name":"main","feed-id":7}`,
 			wantOK: false,
 		},
+		{
+			// An ad detail carries nested object-arrays (images, params). It
+			// must NOT be mistaken for a list envelope, or `ads get` would
+			// render a table of the sub-array instead of the ad.
+			name:   "detail object with nested arrays is not an envelope",
+			input:  `{"id":114491517,"title":"iPhone","images":[{"id":9,"url":"u"}],"params":[{"name":"year","value":2020}]}`,
+			wantOK: false,
+		},
+		{
+			name:   "detail object with a single nested array is not an envelope",
+			input:  `{"id":114491517,"title":"iPhone","images":[{"id":9,"url":"u"}]}`,
+			wantOK: false,
+		},
 	}
 	for _, tc := range cases {
 		tc := tc

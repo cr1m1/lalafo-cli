@@ -1249,27 +1249,39 @@ func compactObjectArrayValue(v any) (any, bool) {
 	return compacted, true
 }
 
+// listEnvelopeArrayKeys are the conventional wrapper keys under which a
+// collection endpoint nests its domain array (lalafo's ads endpoints use
+// "items"). unwrapListEnvelope only treats an object as a list envelope when its
+// array sits under one of these — deliberately NOT via a "single arbitrary
+// object-array" guess, so a detail response that merely contains a nested array
+// (e.g. an ad's images/params) is never mistaken for a collection and
+// mis-rendered as a table of that sub-array.
+var listEnvelopeArrayKeys = []string{"items", "data", "results", "messages", "members", "values"}
+
 // unwrapListEnvelope detects the list-envelope shape that lalafo's collection
 // endpoints return ({"items":[...], "_meta":{...}, "_links":{...}}) and returns
-// the inner domain array as a JSON array. It reuses extractPaginatedItems — the
-// same locator the pagination and --compact paths use — so CSV/plain/table
-// rendering sees rows instead of falling through to a raw-JSON dump of the
-// wrapper object. Returns (nil, false) when data is not an object or carries no
-// single unambiguous domain array.
+// the inner domain array so CSV/plain/table rendering sees rows instead of
+// falling through to a raw-JSON dump of the wrapper object. Returns (nil, false)
+// when data is not an object or carries no array under a conventional wrapper
+// key.
 func unwrapListEnvelope(data json.RawMessage) (json.RawMessage, bool) {
 	var obj map[string]json.RawMessage
 	if err := json.Unmarshal(data, &obj); err != nil || len(obj) == 0 {
 		return nil, false
 	}
-	items, ok := extractPaginatedItems(obj)
-	if !ok {
-		return nil, false
+	for _, key := range listEnvelopeArrayKeys {
+		raw, ok := obj[key]
+		if !ok {
+			continue
+		}
+		// json.Unmarshal accepts JSON null into []json.RawMessage as a nil
+		// slice without error, so require arr != nil to reject a null wrapper.
+		var arr []json.RawMessage
+		if err := json.Unmarshal(raw, &arr); err == nil && arr != nil {
+			return raw, true
+		}
 	}
-	arr, err := json.Marshal(items)
-	if err != nil {
-		return nil, false
-	}
-	return arr, true
+	return nil, false
 }
 
 // listItemsForTabularOutput resolves the row list that CSV/plain/table renderers
