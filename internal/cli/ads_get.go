@@ -16,7 +16,7 @@ func newAdsGetCmd(flags *rootFlags) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:         "get <id>",
 		Short:       "Retrieve full details for a single ad by ID.",
-		Example:     "  lalafo-pp-cli ads get 550e8400-e29b-41d4-a716-446655440000",
+		Example:     "  lalafo-pp-cli ads get 114121330",
 		Annotations: map[string]string{"pp:endpoint": "ads.get", "pp:method": "GET", "pp:path": "/v3/ads/{id}", "mcp:read-only": "true"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {

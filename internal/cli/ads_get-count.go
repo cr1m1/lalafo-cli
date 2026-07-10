@@ -25,7 +25,11 @@ func newAdsGetCountCmd(flags *rootFlags) *cobra.Command {
 				return err
 			}
 			params := map[string]string{}
-			data, prov, err := resolveReadWithStrategy(cmd.Context(), c, flags, "auto", "ads", false, path, params, nil, cmd.ErrOrStderr())
+			// The count endpoint returns a scalar aggregate ({ads_count, ...}),
+			// not an ads collection, so it opts out of write-through caching via
+			// noCacheResourceType — otherwise it upserts a bogus ID-less "ads"
+			// row and prints a spurious "not cached locally" warning.
+			data, prov, err := resolveReadWithStrategy(cmd.Context(), c, flags, "auto", noCacheResourceType, false, path, params, nil, cmd.ErrOrStderr())
 			if err != nil {
 				return classifyAPIError(err, flags)
 			}
