@@ -163,6 +163,41 @@ func TestEnvelopeAwareItemCount(t *testing.T) {
 	}
 }
 
+// TestDetailResponseItemCount covers the provenance counter for single-resource
+// fetches (ads get / ads get-count): a non-empty detail object must report 1,
+// not 0 (the R1 regression — a successful `ads get <id>` printed "0 results
+// (live)" directly above the ad it just fetched, because the old inline count
+// unmarshaled the object into a []json.RawMessage that always came back empty).
+// Arrays and list envelopes still report their row count; JSON null, an empty
+// object, and an empty collection report 0.
+func TestDetailResponseItemCount(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name string
+		in   string
+		want int
+	}{
+		{"single ad detail object", `{"id":114121330,"title":"iPhone 13","price":25000}`, 1},
+		{"detail object with nested arrays", `{"id":1,"images":[{"id":9}],"params":[{"name":"year"}]}`, 1},
+		{"scalar count aggregate", `{"ads_count":123456,"feed-name":"main","feed-id":7}`, 1},
+		{"list envelope", adsListEnvelope, 2},
+		{"bare array", `[{"id":1},{"id":2},{"id":3}]`, 3},
+		{"empty object", `{}`, 0},
+		{"json null", `null`, 0},
+		{"empty array", `[]`, 0},
+		{"empty envelope", `{"items":[],"_meta":{}}`, 0},
+	}
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			if got := detailResponseItemCount(json.RawMessage(tc.in)); got != tc.want {
+				t.Errorf("detailResponseItemCount(%s) = %d, want %d", tc.in, got, tc.want)
+			}
+		})
+	}
+}
+
 // TestPrintCSV_ListEnvelope is the F3 regression: `ads list --csv` must emit a
 // real CSV of the inner rows, not a single-line dump of the wrapper object.
 func TestPrintCSV_ListEnvelope(t *testing.T) {

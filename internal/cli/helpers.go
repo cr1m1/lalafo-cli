@@ -1323,6 +1323,36 @@ func envelopeAwareItemCount(data json.RawMessage) int {
 	return 0
 }
 
+// detailResponseItemCount reports the provenance "N results" count for
+// single-resource fetches (ads get, ads get-count). A detail endpoint returns
+// one JSON object, not a collection, so a non-empty object counts as 1 —
+// envelopeAwareItemCount (tuned for collection endpoints) reports 0 for a
+// single object, which would print "0 results (live)" directly above the ad
+// that was just fetched. Arrays and list envelopes still report their row count
+// for symmetry (checked first, so an *empty* collection stays 0 rather than
+// being counted as a single object); JSON null, an empty object, and a non-JSON
+// body report 0.
+func detailResponseItemCount(data json.RawMessage) int {
+	// Bare array: its own length (0 for an empty array).
+	var arr []json.RawMessage
+	if json.Unmarshal(data, &arr) == nil && arr != nil {
+		return len(arr)
+	}
+	// List envelope: the inner row count (0 for an empty collection).
+	if inner, ok := unwrapListEnvelope(data); ok {
+		var innerArr []json.RawMessage
+		if json.Unmarshal(inner, &innerArr) == nil {
+			return len(innerArr)
+		}
+	}
+	// A single non-empty detail object is one result.
+	var obj map[string]json.RawMessage
+	if err := json.Unmarshal(data, &obj); err == nil && len(obj) > 0 {
+		return 1
+	}
+	return 0
+}
+
 // cellScalarString renders a JSON value as one flat cell. Scalars use their
 // natural textual form; non-scalar values (objects, arrays) are JSON-encoded so
 // CSV/plain output stays machine-parseable instead of leaking Go's map[...] /

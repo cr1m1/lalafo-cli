@@ -143,3 +143,25 @@ not be built as documented and the core browse/export UX was silently broken.
   `114121330` (matching MANUAL.md).
 - **Upstream?**: Lalafo-specific — the generator's example placeholder should use
   the API's real ID shape.
+
+## 2026-07-10: Amend node — detail-fetch provenance count
+
+### Patch 18: `ads get` / `ads get-count` print "0 results" for a successful fetch
+- **Files**: `internal/cli/helpers.go` (new `detailResponseItemCount`),
+  `internal/cli/ads_get.go`, `internal/cli/ads_get-count.go`,
+  `internal/cli/helpers_format_test.go` (`TestDetailResponseItemCount`)
+- **Why**: The single-object detail commands counted results with the inline
+  pattern `var countItems []json.RawMessage; json.Unmarshal(data, &countItems);
+  printProvenance(cmd, len(countItems), prov)`. A single detail object (or the
+  scalar count aggregate) never unmarshals into a `[]json.RawMessage`, so the
+  count was **always 0** — a successful `ads get <id>` printed "0 results (live)"
+  directly above the ad it just fetched, and `ads get-count` did the same above
+  the count. This is the *inline* form Patch 13 replaced in `ads_list.go` /
+  `ads_search.go` with `envelopeAwareItemCount`, but left in the detail commands.
+  Now both call `detailResponseItemCount`, a sibling that reports array length
+  for a bare array, inner row count for a list envelope, `1` for a single
+  non-empty object, and `0` for JSON null / an empty object / an empty
+  collection.
+- **Upstream?**: Yes — same systemic generator pattern as Patch 13 (the
+  detail-command provenance counter should be envelope/object aware, not a bare
+  `[]json.RawMessage` length).
