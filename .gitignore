@@ -1,7 +1,8 @@
-# Binaries
-lalafo-pp-cli
-lalafo-pp-mcp
-lalafo
+# Binaries (root build artifacts only; anchored so cmd/lalafo-pp-cli/ and
+# cmd/lalafo-pp-mcp/ source dirs are not swallowed).
+/lalafo-pp-cli
+/lalafo-pp-mcp
+/lalafo
 *.exe
 
 # Build artifacts

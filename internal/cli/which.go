@@ -26,7 +26,85 @@ type whichEntry struct {
 // its hero features. Endpoint-level commands are discoverable via
 // `--help`; `which` exists to resolve a natural-language capability
 // query to one of the commands the skill says matter most.
-var whichIndex = []whichEntry{}
+//
+// Every Command here must resolve in the Cobra tree (enforced by
+// TestWhichIndex_ExistsAndIsWellFormed) and mirrors the capabilities the
+// SKILL.md Command Reference advertises, so a `which` query never points an
+// agent at a command that does not exist.
+var whichIndex = []whichEntry{
+	{
+		Command:      "ads search",
+		Description:  "Search ads by keyword query with an optional category filter.",
+		Group:        "Ads",
+		WhyItMatters: "Primary way to find listings by keyword across the marketplace.",
+	},
+	{
+		Command:      "ads list",
+		Description:  "Browse the latest ads with optional category and user filters (paginated).",
+		Group:        "Ads",
+		WhyItMatters: "Feed of recent listings; narrow by category or seller.",
+	},
+	{
+		Command:      "ads get",
+		Description:  "Retrieve full details for a single ad by its numeric ID.",
+		Group:        "Ads",
+		WhyItMatters: "Full detail view once you have an ad ID from list/search.",
+	},
+	{
+		Command:      "ads get-count",
+		Description:  "Return the total number of active ads.",
+		Group:        "Ads",
+		WhyItMatters: "Marketplace size / activity gauge.",
+	},
+	{
+		Command:      "categories",
+		Description:  "Return the full hierarchical category tree with nested children.",
+		Group:        "Taxonomy",
+		WhyItMatters: "Resolve category IDs used to filter ads list/search.",
+	},
+	{
+		Command:      "countries",
+		Description:  "Return all countries where Lalafo operates.",
+		Group:        "Taxonomy",
+		WhyItMatters: "Country IDs for locale-scoped queries.",
+	},
+	{
+		Command:      "params",
+		Description:  "List filter parameters (condition, model, year, ...) available for a category.",
+		Group:        "Taxonomy",
+		WhyItMatters: "Discover the filterable fields for a category before searching.",
+	},
+	{
+		Command:      "users",
+		Description:  "Retrieve a user's public profile by ID.",
+		Group:        "Users",
+		WhyItMatters: "Look up the seller behind an ad.",
+	},
+	{
+		Command:      "sync",
+		Description:  "Sync resources into the local SQLite store for offline and faster reads.",
+		Group:        "Local state",
+		WhyItMatters: "Populate the local store so search/sql run without the API.",
+	},
+	{
+		Command:      "search",
+		Description:  "Full-text search across resources already synced to the local store.",
+		Group:        "Local state",
+		WhyItMatters: "Fast offline keyword search once data is synced.",
+	},
+	{
+		Command:      "doctor",
+		Description:  "Verify auth, connectivity, and path configuration.",
+		Group:        "Diagnostics",
+		WhyItMatters: "First stop when a command is not behaving.",
+	},
+	{
+		Command:      "agent-context",
+		Description:  "Emit machine-readable runtime context (paths, profiles, schema) for agents.",
+		Group:        "Diagnostics",
+		WhyItMatters: "How an agent introspects this CLI's runtime truth.",
+	},
+}
 
 // whichMatch pairs an index entry with its ranking score for a query.
 // Higher score means stronger match. The ranker is naive (exact token
