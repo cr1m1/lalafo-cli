@@ -274,10 +274,22 @@ var writeThroughListWrapperKeys = []string{
 }
 var writeThroughNestedEnvelopeKeys = []string{"data", "Data", "result", "Result"}
 
+// noCacheResourceType marks a read whose response is not a cacheable entity
+// collection, so write-through caching is skipped for it. The scalar
+// /v3/ads/count aggregate uses this: it has no per-row ID, and routing it
+// through the "ads" auto-cache upserts a bogus row and emits a spurious
+// "no extractable ID field" warning on an otherwise perfect result.
+const noCacheResourceType = ""
+
 // writeThroughCache upserts live API results into the local SQLite store so
 // FTS search covers everything the user has looked up — not just explicit syncs.
 // Best-effort: failures are silently ignored (the live result already succeeded).
 func writeThroughCache(ctx context.Context, resourceType string, data json.RawMessage) {
+	// Reads flagged non-cacheable (e.g. the scalar ads count) never touch the
+	// store: no resource type means no per-row entity to upsert.
+	if resourceType == noCacheResourceType {
+		return
+	}
 	db, err := store.OpenWithContext(ctx, defaultDBPath("lalafo-pp-cli"))
 	if err != nil {
 		return

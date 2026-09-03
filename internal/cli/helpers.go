@@ -1249,10 +1249,151 @@ func compactObjectArrayValue(v any) (any, bool) {
 	return compacted, true
 }
 
-// printCSV renders JSON arrays as CSV with header row.
+// listEnvelopeArrayKeys are the conventional wrapper keys under which a
+// collection endpoint nests its domain array (lalafo's ads endpoints use
+// "items"). unwrapListEnvelope only treats an object as a list envelope when its
+// array sits under one of these — deliberately NOT via a "single arbitrary
+// object-array" guess, so a detail response that merely contains a nested array
+// (e.g. an ad's images/params) is never mistaken for a collection and
+// mis-rendered as a table of that sub-array.
+var listEnvelopeArrayKeys = []string{"items", "data", "results", "messages", "members", "values"}
+
+// unwrapListEnvelope detects the list-envelope shape that lalafo's collection
+// endpoints return ({"items":[...], "_meta":{...}, "_links":{...}}) and returns
+// the inner domain array so CSV/plain/table rendering sees rows instead of
+// falling through to a raw-JSON dump of the wrapper object. Returns (nil, false)
+// when data is not an object or carries no array under a conventional wrapper
+// key.
+func unwrapListEnvelope(data json.RawMessage) (json.RawMessage, bool) {
+	var obj map[string]json.RawMessage
+	if err := json.Unmarshal(data, &obj); err != nil || len(obj) == 0 {
+		return nil, false
+	}
+	for _, key := range listEnvelopeArrayKeys {
+		raw, ok := obj[key]
+		if !ok {
+			continue
+		}
+		// json.Unmarshal accepts JSON null into []json.RawMessage as a nil
+		// slice without error, so require arr != nil to reject a null wrapper.
+		var arr []json.RawMessage
+		if err := json.Unmarshal(raw, &arr); err == nil && arr != nil {
+			return raw, true
+		}
+	}
+	return nil, false
+}
+
+// listItemsForTabularOutput resolves the row list that CSV/plain/table renderers
+// should print. It accepts either a bare JSON array of objects or a list-envelope
+// object (unwrapped via unwrapListEnvelope). Returns (nil, false) when data is a
+// single detail object or an empty collection, so callers fall back to their
+// raw/JSON output path.
+func listItemsForTabularOutput(data json.RawMessage) ([]map[string]any, bool) {
+	var items []map[string]any
+	if err := json.Unmarshal(data, &items); err == nil && len(items) > 0 {
+		return items, true
+	}
+	if inner, ok := unwrapListEnvelope(data); ok {
+		var innerItems []map[string]any
+		if json.Unmarshal(inner, &innerItems) == nil && len(innerItems) > 0 {
+			return innerItems, true
+		}
+	}
+	return nil, false
+}
+
+// envelopeAwareItemCount reports how many result rows `data` carries for the
+// human-facing "N results" provenance summary. It understands both bare arrays
+// and list envelopes ({"items":[...], "_meta":{...}}); anything else counts as
+// 0. Used only for the stderr summary line, never for output shaping — without
+// it, list/search responses (which arrive as an envelope object, not a bare
+// array) always reported "0 results" above a populated table.
+func envelopeAwareItemCount(data json.RawMessage) int {
+	var arr []json.RawMessage
+	if json.Unmarshal(data, &arr) == nil {
+		return len(arr)
+	}
+	if inner, ok := unwrapListEnvelope(data); ok {
+		var innerArr []json.RawMessage
+		if json.Unmarshal(inner, &innerArr) == nil {
+			return len(innerArr)
+		}
+	}
+	return 0
+}
+
+// detailResponseItemCount reports the provenance "N results" count for
+// single-resource fetches (ads get, ads get-count). A detail endpoint returns
+// one JSON object, not a collection, so a non-empty object counts as 1 —
+// envelopeAwareItemCount (tuned for collection endpoints) reports 0 for a
+// single object, which would print "0 results (live)" directly above the ad
+// that was just fetched. Arrays and list envelopes still report their row count
+// for symmetry (checked first, so an *empty* collection stays 0 rather than
+// being counted as a single object); JSON null, an empty object, and a non-JSON
+// body report 0.
+func detailResponseItemCount(data json.RawMessage) int {
+	// Bare array: its own length (0 for an empty array).
+	var arr []json.RawMessage
+	if json.Unmarshal(data, &arr) == nil && arr != nil {
+		return len(arr)
+	}
+	// List envelope: the inner row count (0 for an empty collection).
+	if inner, ok := unwrapListEnvelope(data); ok {
+		var innerArr []json.RawMessage
+		if json.Unmarshal(inner, &innerArr) == nil {
+			return len(innerArr)
+		}
+	}
+	// A single non-empty detail object is one result.
+	var obj map[string]json.RawMessage
+	if err := json.Unmarshal(data, &obj); err == nil && len(obj) > 0 {
+		return 1
+	}
+	return 0
+}
+
+// cellScalarString renders a JSON value as one flat cell. Scalars use their
+// natural textual form; non-scalar values (objects, arrays) are JSON-encoded so
+// CSV/plain output stays machine-parseable instead of leaking Go's map[...] /
+// [...] fmt representation for nested fields (e.g. a country's "capital" object).
+func cellScalarString(v any) string {
+	switch t := v.(type) {
+	case nil:
+		return ""
+	case string:
+		return t
+	case bool:
+		if t {
+			return "true"
+		}
+		return "false"
+	case float64:
+		return strconv.FormatFloat(t, 'f', -1, 64)
+	case json.Number:
+		return t.String()
+	default:
+		if b, err := json.Marshal(v); err == nil {
+			return string(b)
+		}
+		return fmt.Sprintf("%v", v)
+	}
+}
+
+// printCSV renders JSON arrays (and list-envelope objects) as CSV with a header row.
 func printCSV(w io.Writer, data json.RawMessage) error {
 	var items []map[string]any
 	if err := json.Unmarshal(data, &items); err != nil || len(items) == 0 {
+		// Not a usable bare array. Try the list-envelope shape before falling
+		// back to a raw dump so `ads list --csv` exports rows, not the wrapper.
+		if inner, ok := unwrapListEnvelope(data); ok {
+			var innerItems []map[string]any
+			if json.Unmarshal(inner, &innerItems) == nil && len(innerItems) > 0 {
+				items = innerItems
+			}
+		}
+	}
+	if len(items) == 0 {
 		// Single object or empty - just print as JSON
 		fmt.Fprintln(w, string(data))
 		return nil
@@ -1275,35 +1416,35 @@ func printCSV(w io.Writer, data json.RawMessage) error {
 	for _, item := range items {
 		var vals []string
 		for _, k := range keys {
-			v := item[k]
-			if v == nil {
-				vals = append(vals, "")
-			} else {
-				var s string
-				if f, ok := v.(float64); ok {
-					s = strconv.FormatFloat(f, 'f', -1, 64)
-				} else {
-					s = fmt.Sprintf("%v", v)
-				}
-				// Bug #4 fix: include \r per RFC 4180.
-				if strings.ContainsAny(s, ",\"\n\r") {
-					s = `"` + strings.ReplaceAll(s, `"`, `""`) + `"`
-				}
-				vals = append(vals, s)
+			s := cellScalarString(item[k])
+			// Bug #4 fix: include \r per RFC 4180.
+			if strings.ContainsAny(s, ",\"\n\r") {
+				s = `"` + strings.ReplaceAll(s, `"`, `""`) + `"`
 			}
+			vals = append(vals, s)
 		}
 		fmt.Fprintln(w, strings.Join(vals, ","))
 	}
 	return nil
 }
 
-// printPlain renders JSON arrays as tab-separated text with a header row.
+// printPlain renders JSON arrays (and list-envelope objects) as tab-separated
+// text with a header row.
 func printPlain(w io.Writer, data json.RawMessage) error {
 	var items []map[string]any
 	if err := json.Unmarshal(data, &items); err != nil {
-		// Single object - just print as JSON
-		fmt.Fprintln(w, string(data))
-		return nil
+		// Not a bare array. Try the list-envelope shape ({items:[...], _meta})
+		// before treating the payload as a single object.
+		inner, ok := unwrapListEnvelope(data)
+		if !ok {
+			// Single object - just print as JSON
+			fmt.Fprintln(w, string(data))
+			return nil
+		}
+		if err := json.Unmarshal(inner, &items); err != nil {
+			fmt.Fprintln(w, string(data))
+			return nil
+		}
 	}
 	if len(items) == 0 {
 		return nil
@@ -1331,15 +1472,7 @@ func printPlain(w io.Writer, data json.RawMessage) error {
 }
 
 func plainCellValue(v any) string {
-	if v == nil {
-		return ""
-	}
-	var s string
-	if f, ok := v.(float64); ok {
-		s = strconv.FormatFloat(f, 'f', -1, 64)
-	} else {
-		s = fmt.Sprintf("%v", v)
-	}
+	s := cellScalarString(v)
 	s = strings.ReplaceAll(s, "\t", " ")
 	s = strings.ReplaceAll(s, "\r\n", " ")
 	s = strings.ReplaceAll(s, "\n", " ")
@@ -1359,9 +1492,11 @@ func printOutput(w io.Writer, data json.RawMessage, asJSON bool) error {
 		return enc.Encode(data)
 	}
 
-	// Try to detect if response is an array
-	var items []map[string]any
-	if err := json.Unmarshal(data, &items); err == nil && len(items) > 0 {
+	// Try to detect if response is an array (bare, or wrapped in a list
+	// envelope like {"items":[...], "_meta":{...}}). Without the envelope
+	// unwrap, `ads list`/`ads search` fall through to the raw-JSON object
+	// branch below and dump a wall of JSON instead of a browsable table.
+	if items, ok := listItemsForTabularOutput(data); ok {
 		if err := printAutoTable(w, items); err != nil {
 			return err
 		}
